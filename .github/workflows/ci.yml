@@ -1,0 +1,174 @@
+name: CI / CD
+
+# develop -> builds, scans, pushes images, auto-deploys to DEV
+# main    -> builds, scans, pushes images, auto-deploys to STAGING
+# prod    -> never automatic: run the "Deploy" workflow manually (approval required)
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_PREFIX: healthcare
+
+jobs:
+  # ---------------------------------------------------------------- 1. validate
+  backend:
+    name: Backend lint + tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r backend/requirements-dev.txt
+      - name: flake8
+        working-directory: backend
+        run: flake8 .
+      - name: Tenant-isolation tests (SQLite, no external services)
+        working-directory: backend
+        env:
+          TENANT_DB_ENGINE: sqlite
+          TENANTS_FILE: ../database/tenants/tenants.json
+          DJANGO_DEBUG: "true"
+        run: |
+          python manage.py check
+          python manage.py makemigrations --check --dry-run
+          python manage.py test -v 2
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  config:
+    name: Compose + shell validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker compose config (local stack)
+        run: docker compose -f docker/docker-compose.yml --env-file .env.example config -q
+      - name: docker compose config (server stack)
+        env:
+          AWS_REGION: ap-south-1
+          APP_ENV: dev
+          ECR_REGISTRY: 123456789012.dkr.ecr.ap-south-1.amazonaws.com
+          IMAGE_TAG: ci
+        run: |
+          sudo mkdir -p /opt/healthcare && sudo touch /opt/healthcare/.env
+          docker compose -f docker/docker-compose.prod.yml config -q
+      - name: shellcheck
+        run: shellcheck -S warning scripts/*.sh scripts/host/*.sh database/scripts/*.sh database/init/*.sh docker/*.sh
+
+  # ------------------------------------------------- 2. build, scan, push images
+  images:
+    name: Image ${{ matrix.image }} (build, scan, push)
+    needs: [backend, frontend, config]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # OIDC to AWS
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - image: backend
+            dockerfile: docker/backend.Dockerfile
+          - image: frontend
+            dockerfile: docker/frontend.Dockerfile
+          - image: nginx
+            dockerfile: nginx/Dockerfile
+    env:
+      PUSH: ${{ github.event_name == 'push' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image (local, for scanning)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          load: true
+          tags: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+      - name: Vulnerability scan (Trivy) - fail on fixable HIGH/CRITICAL
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ github.sha }}
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          vuln-type: os,library
+
+      - name: Configure AWS credentials (OIDC, no stored keys)
+        if: env.PUSH == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: env.PUSH == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push to ECR (immutable tag = commit SHA)
+        if: env.PUSH == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.IMAGE_PREFIX }}-${{ matrix.image }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+
+  # ---------------------------------------------------------- 3. auto-deploy
+  deploy-dev:
+    name: Deploy to DEV
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: images
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: dev
+      image_tag: ${{ github.sha }}
+    secrets: inherit
+
+  deploy-staging:
+    name: Deploy to STAGING
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: images
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      image_tag: ${{ github.sha }}
+    secrets: inherit

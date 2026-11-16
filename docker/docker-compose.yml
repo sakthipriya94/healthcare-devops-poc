@@ -1,0 +1,85 @@
+# Local development / demo stack.
+#   make up        (from repo root; uses ./.env)
+# Open http://hospital-a.localhost and http://hospital-b.localhost
+# (*.localhost resolves to 127.0.0.1 in modern browsers and curl).
+name: healthcare
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      HOSPITAL_A_DB_PASSWORD: ${HOSPITAL_A_DB_PASSWORD:?set in .env}
+      HOSPITAL_B_DB_PASSWORD: ${HOSPITAL_B_DB_PASSWORD:?set in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data        # persistent database volume
+      - ../database/init:/docker-entrypoint-initdb.d:ro
+      - ../database/scripts:/opt/db-scripts:ro
+    networks: [db_net]                          # not reachable from nginx/frontend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/backend.Dockerfile
+    image: healthcare/backend:local
+    restart: unless-stopped
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?set in .env}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-false}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,.localhost}
+      ALLOW_TENANT_HEADER: ${ALLOW_TENANT_HEADER:-false}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_SSLMODE: disable                        # same Docker network; TLS is enforced on RDS
+      HOSPITAL_A_DB_PASSWORD: ${HOSPITAL_A_DB_PASSWORD:?set in .env}
+      HOSPITAL_B_DB_PASSWORD: ${HOSPITAL_B_DB_PASSWORD:?set in .env}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [app_net, db_net]
+    healthcheck:                                  # also defined in the image; repeated for clarity
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/live/', headers={'Host': 'localhost'}), timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+    image: healthcare/frontend:local
+    restart: unless-stopped
+    networks: [app_net]
+
+  nginx:
+    build:
+      context: ..
+      dockerfile: nginx/Dockerfile
+    image: healthcare/nginx:local
+    restart: unless-stopped
+    ports:
+      - "80:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks: [app_net]
+
+networks:
+  app_net: {}
+  db_net:
+    internal: true                               # no outbound internet, no host access
+
+volumes:
+  pgdata: {}

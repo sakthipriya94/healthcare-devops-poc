@@ -1,0 +1,80 @@
+name: Terraform
+
+# Pull requests that touch terraform/: format check, validate, security scan, and
+# (when an AWS plan role is configured) a read-only plan. `apply` is intentionally
+# NOT automated in this POC - a human runs it (see README) after reviewing the plan.
+on:
+  pull_request:
+    paths: ["terraform/**", ".github/workflows/terraform.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+      - name: fmt
+        run: terraform fmt -check -recursive terraform
+      - name: validate root module
+        working-directory: terraform
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: validate bootstrap
+        working-directory: terraform/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Misconfiguration scan (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,CRITICAL
+          exit-code: "0" # report-only; tighten to "1" once findings are triaged
+
+  plan:
+    needs: validate
+    if: vars.TF_PLAN_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TF_PLAN_ROLE_ARN }} # read-only role + state access
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: plan (dev)
+        working-directory: terraform
+        run: |
+          cat > ci.backend.hcl <<EOF
+          bucket       = "${{ vars.TF_STATE_BUCKET }}"
+          key          = "healthcare/dev/terraform.tfstate"
+          region       = "${{ vars.AWS_REGION }}"
+          encrypt      = true
+          use_lockfile = true
+          EOF
+          terraform init -input=false -backend-config=ci.backend.hcl
+          terraform plan -input=false -lock=false -var-file=environments/dev.tfvars \
+            -var "github_repository=${{ github.repository }}" -no-color | tee plan.txt
+      - name: Comment plan on the PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/plan.txt', 'utf8').slice(-60000);
+            await github.rest.issues.createComment({
+              ...context.repo, issue_number: context.issue.number,
+              body: '### Terraform plan (dev)\n```\n' + plan + '\n```'
+            });

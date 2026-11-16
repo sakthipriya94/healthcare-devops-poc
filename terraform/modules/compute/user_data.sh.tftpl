@@ -1,0 +1,54 @@
+#!/bin/bash
+# First-boot provisioning of the application host (Amazon Linux 2023).
+# Only NON-secret settings are written here. Secrets are fetched from AWS
+# Secrets Manager at deploy time by /opt/healthcare/scripts/render_env.sh.
+set -euxo pipefail
+
+dnf install -y docker jq python3 postgresql16 amazon-cloudwatch-agent cronie
+systemctl enable --now docker crond
+
+# Docker Compose v2 plugin
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-x86_64" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+install -d -m 0750 /opt/healthcare /opt/healthcare/scripts
+
+cat > /opt/healthcare/static.env <<'EOF'
+APP_ENV=${environment}
+PROJECT=${project}
+AWS_REGION=${aws_region}
+AWS_DEFAULT_REGION=${aws_region}
+ECR_REGISTRY=${ecr_registry}
+DB_HOST=${db_host}
+MASTER_SECRET_ARN=${db_master_secret_arn}
+ARTIFACTS_BUCKET=${artifacts_bucket}
+BACKUPS_BUCKET=${backups_bucket}
+DJANGO_ALLOWED_HOSTS=${allowed_hosts}
+EOF
+chmod 0640 /opt/healthcare/static.env
+
+# CloudWatch agent: memory + disk (CPU comes from EC2 metrics natively)
+cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json <<'EOF'
+{
+  "agent": { "metrics_collection_interval": 60 },
+  "metrics": {
+    "namespace": "CWAgent",
+    "append_dimensions": { "InstanceId": "$${aws:InstanceId}" },
+    "aggregation_dimensions": [["InstanceId"]],
+    "metrics_collected": {
+      "mem":  { "measurement": ["mem_used_percent"] },
+      "disk": { "measurement": ["used_percent"], "resources": ["/"] }
+    }
+  }
+}
+EOF
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+
+# Nightly logical backup of every tenant database to S3 (in addition to RDS automated backups)
+cat > /etc/cron.d/healthcare-backup <<'EOF'
+30 21 * * * root [ -x /opt/healthcare/scripts/backup.sh ] && /opt/healthcare/scripts/backup.sh >> /var/log/healthcare-backup.log 2>&1
+EOF
+chmod 0644 /etc/cron.d/healthcare-backup

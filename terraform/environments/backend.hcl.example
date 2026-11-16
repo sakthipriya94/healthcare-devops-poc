@@ -1,0 +1,7 @@
+# Copy to environments/<env>.backend.hcl (git-ignored pattern *.backend.hcl is NOT secret,
+# but contains your account id, so keep it local) and fill in the bucket created by bootstrap/.
+bucket       = "healthcare-tfstate-<ACCOUNT_ID>-ap-south-1"
+key          = "healthcare/dev/terraform.tfstate"   # change per environment
+region       = "ap-south-1"
+encrypt      = true
+use_lockfile = true # S3 native locking (Terraform >= 1.10), no DynamoDB table needed

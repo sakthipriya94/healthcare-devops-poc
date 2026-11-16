@@ -1,0 +1,55 @@
+# Server (EC2) stack. PostgreSQL is Amazon RDS, so there is no db container.
+# Images come from ECR; secrets/values are rendered into /opt/healthcare/.env
+# at deploy time by scripts/render_env.sh (AWS Secrets Manager + instance role).
+# Started by scripts/deploy.sh:  docker compose -f docker-compose.prod.yml up -d
+name: healthcare
+
+x-logging: &logging
+  driver: awslogs                                 # container logs -> CloudWatch Logs
+  options:
+    awslogs-region: ${AWS_REGION}
+    awslogs-group: /healthcare/${APP_ENV}/containers
+    awslogs-create-group: "false"                 # created by Terraform
+    tag: "{{.Name}}/{{.ID}}"
+
+services:
+  backend:
+    image: ${ECR_REGISTRY}/healthcare-backend:${IMAGE_TAG}
+    restart: always
+    env_file: /opt/healthcare/.env
+    environment:
+      DJANGO_DEBUG: "false"
+      ALLOW_TENANT_HEADER: "false"
+      DB_SSLMODE: require                         # TLS to RDS
+      DB_PORT: "5432"
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
+    logging: *logging
+    networks: [app_net]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen(u.Request('http://127.0.0.1:8000/api/live/', headers={'Host': 'localhost'}), timeout=2)"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    image: ${ECR_REGISTRY}/healthcare-frontend:${IMAGE_TAG}
+    restart: always
+    logging: *logging
+    networks: [app_net]
+
+  nginx:
+    image: ${ECR_REGISTRY}/healthcare-nginx:${IMAGE_TAG}
+    restart: always
+    ports:
+      - "80:8080"                                 # TLS terminates at the ALB (ACM certificate)
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    logging: *logging
+    networks: [app_net]
+
+networks:
+  app_net: {}

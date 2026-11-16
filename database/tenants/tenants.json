@@ -1,0 +1,31 @@
+{
+  "_comment": "Non-secret tenant -> database mapping. Passwords are NEVER stored here: password_env names the environment variable that holds the password at runtime. To onboard a tenant, add an entry here (see docs/multi-tenant-database.md).",
+  "tenants": [
+    {
+      "id": "hospital_a",
+      "name": "Hospital A",
+      "subdomain": "hospital-a",
+      "region": "ap-south-1",
+      "hosts": [],
+      "db": {
+        "name": "hospital_a",
+        "user": "hospital_a_user",
+        "password_env": "HOSPITAL_A_DB_PASSWORD",
+        "host_env": "DB_HOST"
+      }
+    },
+    {
+      "id": "hospital_b",
+      "name": "Hospital B",
+      "subdomain": "hospital-b",
+      "region": "ap-south-1",
+      "hosts": [],
+      "db": {
+        "name": "hospital_b",
+        "user": "hospital_b_user",
+        "password_env": "HOSPITAL_B_DB_PASSWORD",
+        "host_env": "DB_HOST"
+      }
+    }
+  ]
+}
