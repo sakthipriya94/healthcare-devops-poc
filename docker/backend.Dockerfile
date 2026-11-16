@@ -12,6 +12,13 @@ FROM python:3.13-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# Apply fixed OS packages released after the base image was built, and a current pip
+# (keeps the Trivy HIGH/CRITICAL gate green without ignoring findings).
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade pip
+
 # Non-root user
 RUN groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app
 WORKDIR /app
