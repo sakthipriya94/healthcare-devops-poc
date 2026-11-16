@@ -12,12 +12,12 @@ FROM python:3.13-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# Apply fixed OS packages released after the base image was built, and a current pip
+# Apply fixed OS packages released after the base image was built, and current pip/setuptools (CVE-2025-47273 in the bundled setuptools 70.3.0)
 # (keeps the Trivy HIGH/CRITICAL gate green without ignoring findings).
 RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir --upgrade pip
+    && pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1"
 
 # Non-root user
 RUN groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app
