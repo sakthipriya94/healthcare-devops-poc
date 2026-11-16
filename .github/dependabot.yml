@@ -1,17 +1,52 @@
 version: 2
+# Major-version bumps (Python 3.13->3.15, Django 5->6, React 18->19, Vite 5->8, AWS provider 5->6, ...)
+# need a human to plan the upgrade, so Dependabot only proposes minor/patch updates, grouped into
+# ONE weekly PR per ecosystem instead of one PR per package.
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      actions: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: pip
     directory: /backend
     schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      python: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: django
+        update-types: ["version-update:semver-minor"] # stay on the Django LTS line
+
   - package-ecosystem: npm
     directory: /frontend
     schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    groups:
+      npm: { update-types: [minor, patch] }
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: docker
     directory: /docker
     schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: terraform
     directory: /terraform
     schedule: { interval: weekly }
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

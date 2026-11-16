@@ -43,7 +43,8 @@ jobs:
 
   plan:
     needs: validate
-    if: vars.TF_PLAN_ROLE_ARN != ''
+    # Dependabot PRs get no OIDC token and a read-only GITHUB_TOKEN, so they cannot plan or comment.
+    if: vars.TF_PLAN_ROLE_ARN != '' && github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
