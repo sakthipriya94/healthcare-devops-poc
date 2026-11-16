@@ -123,6 +123,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
           vuln-type: os,library
+          trivyignores: .trivyignore
 
       - name: Configure AWS credentials (OIDC, no stored keys)
         if: env.PUSH == 'true'
