@@ -1,0 +1,9 @@
+# Trivy ignore list. Every entry needs a reason and an expiry so it is re-reviewed.
+#
+# CVE-2025-47273 (setuptools 70.3.0, path traversal in PackageIndex)
+#   Reported for the backend image as a path-less "Python" finding that comes from SBOM metadata
+#   shipped with the python:3.13-slim base image. setuptools is not installed in the final image:
+#   docker/backend.Dockerfile uninstalls setuptools and wheel, and the scan's own package list
+#   (Django, DRF, gunicorn, psycopg, pip, ...) contains no setuptools. Not exploitable.
+#   Re-check when the base image is next bumped.
+CVE-2025-47273 exp:2027-03-01

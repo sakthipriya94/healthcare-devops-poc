@@ -135,7 +135,7 @@ resource "aws_instance" "app" {
     artifacts_bucket     = var.artifacts_bucket
     backups_bucket       = var.backups_bucket
     compose_version      = var.compose_version
-    allowed_hosts        = join(",", compact(concat(
+    allowed_hosts = join(",", compact(concat(
       ["localhost", ".${aws_lb.this.dns_name}"],
       var.domain_name == "" ? [] : [".${var.domain_name}"],
       var.extra_allowed_hosts,

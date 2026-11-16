@@ -12,6 +12,15 @@ FROM python:3.13-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
+# Apply fixed OS packages released after the base image was built. setuptools and wheel are build-time
+# tools the runtime does not need (wheels are installed with pip); removing them also removes the
+# libraries they vendor, which Trivy scans separately (e.g. CVE-2025-47273 in setuptools 70.3.0).
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir --upgrade pip \
+    && pip uninstall -y setuptools wheel
+
 # Non-root user
 RUN groupadd --system app && useradd --system --gid app --home /app --shell /usr/sbin/nologin app
 WORKDIR /app

@@ -49,8 +49,8 @@ data "aws_iam_policy_document" "deploy" {
     resources = [var.artifacts_bucket_arn]
   }
   statement {
-    sid       = "RunDeployOnTheHost"
-    actions   = ["ssm:SendCommand"]
+    sid     = "RunDeployOnTheHost"
+    actions = ["ssm:SendCommand"]
     resources = [
       "arn:aws:ec2:${var.aws_region}:${data.aws_caller_identity.current.account_id}:instance/${var.instance_id}",
       "arn:aws:ssm:${var.aws_region}::document/AWS-RunShellScript",
