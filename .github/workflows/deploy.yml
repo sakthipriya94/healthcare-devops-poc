@@ -59,8 +59,7 @@ jobs:
       name: ${{ inputs.environment }}
 
     # Production deployment only from main
-    if: inputs.environment != 'prod' || github.ref == 'refs/heads/main'
-
+    if: inputs.environment == 'dev'
     env:
       AWS_REGION: ap-south-1
       INSTANCE_ID: ${{ vars.INSTANCE_ID }}
@@ -84,7 +83,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::402372753653:role/github-actions-devops-role
+          role-to-assume: arn:aws:iam::402372753653:role/healthcare-dev-github-deploy
           aws-region: ap-south-1
           audience: sts.amazonaws.com
           output-env-credentials: true

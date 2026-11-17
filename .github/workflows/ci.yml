@@ -135,7 +135,7 @@ jobs:
             dockerfile: nginx/Dockerfile
 
     env:
-      PUSH: ${{ github.event_name == 'push' }}
+      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
 
     steps:
       - name: Checkout code
@@ -238,7 +238,6 @@ jobs:
     name: Deploy to DEV
 
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-
     needs: images
 
     permissions:
@@ -259,7 +258,7 @@ jobs:
   deploy-staging:
     name: Deploy to STAGING
 
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: false # Local-only POC: AWS deployment disabled
 
     needs: images
 
