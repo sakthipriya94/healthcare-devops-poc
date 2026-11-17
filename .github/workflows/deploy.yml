@@ -2,8 +2,7 @@
 name: Deploy
 
 # Used in two ways:
-# 1. Automatically called by ci.yml for DEV and STAGING.
-# 2. Manually triggered for DEV, STAGING, PROD or rollback.
+# Called by ci.yml for DEV or manually triggered for DEV.
 
 on:
   workflow_call:
@@ -22,8 +21,6 @@ on:
         type: choice
         options:
           - dev
-          - staging
-          - prod
         required: true
 
       action:
