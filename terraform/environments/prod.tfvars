@@ -1,7 +1,7 @@
 # Production profile (documented; NOT applied for the POC to avoid cost).
 environment       = "prod"
 aws_region        = "ap-south-1"
-github_repository = "YOUR_GITHUB_USER/healthcare-multitenant-poc" # <-- change
+github_repository = "sakthipriya94/healthcare-devops-poc"
 
 manage_ecr = false
 
