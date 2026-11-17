@@ -2,7 +2,8 @@ environment       = "staging"
 aws_region        = "ap-south-1"
 github_repository = "sakthipriya94/healthcare-devops-poc"
 
-manage_ecr = false # uses the repositories created by the dev environment
+manage_ecr    = false # uses the repositories created by the dev environment
+manage_github = true
 
 # Distinct, non-overlapping address space (allows VPC peering / VPN later)
 vpc_cidr             = "10.20.0.0/16"

@@ -1,0 +1,92 @@
+name: Terraform Apply
+
+# Manual only. Builds (or updates) the AWS infrastructure for one environment AND writes the
+# resulting GitHub variables (INSTANCE_ID, ARTIFACTS_BUCKET, APP_URL, TENANT_HOSTS, ...) for you.
+#
+# One-time setup (repository -> Settings -> Secrets and variables -> Actions):
+#   variable  TF_STATE_BUCKET     state bucket created by terraform/bootstrap
+#   variable  TF_APPLY_ROLE_ARN   AWS role this workflow assumes through OIDC. It must be allowed to create
+#                                 the stack (VPC, EC2, RDS, S3, IAM, ...) and trusted for
+#                                 repo:<owner>/<repo>:environment:<env> - see docs/terraform-automation.md
+#   secret    TF_GITHUB_TOKEN     personal access token (repo scope) so Terraform can write the variables
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to build
+        type: choice
+        options: [dev, staging, prod]
+        default: staging
+      action:
+        description: plan = preview only, apply = create/update the infrastructure
+        type: choice
+        options: [plan, apply]
+        default: plan
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: terraform-${{ inputs.environment }}
+  cancel-in-progress: false # never interrupt a running apply
+
+jobs:
+  terraform:
+    name: terraform ${{ inputs.action }} (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Uses the GitHub Environment of the same name, so `prod` can require reviewers.
+    environment: ${{ inputs.environment }}
+    # Production only from main
+    if: inputs.environment != 'prod' || github.ref == 'refs/heads/main'
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_INPUT: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.10"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.TF_APPLY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
+
+      - name: Init (remote state)
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=healthcare/${{ inputs.environment }}/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION || 'ap-south-1' }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Plan
+        env:
+          GITHUB_TOKEN: ${{ secrets.TF_GITHUB_TOKEN }}
+        run: terraform plan -var-file=environments/${{ inputs.environment }}.tfvars -out=tfplan -no-color
+
+      - name: Apply
+        if: inputs.action == 'apply'
+        env:
+          GITHUB_TOKEN: ${{ secrets.TF_GITHUB_TOKEN }}
+        run: terraform apply -no-color tfplan
+
+      - name: Show outputs
+        if: inputs.action == 'apply'
+        run: |
+          {
+            echo "### Terraform outputs (${{ inputs.environment }})"
+            echo '```'
+            terraform output -no-color
+            echo '```'
+            echo "GitHub environment variables for \`${{ inputs.environment }}\` were written by Terraform."
+            echo "Next: push to \`main\` (staging) or run the **Deploy** workflow."
+          } >> "$GITHUB_STEP_SUMMARY"

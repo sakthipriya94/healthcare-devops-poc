@@ -113,3 +113,9 @@ variable "log_retention_days" {
   type    = number
   default = 14
 }
+
+variable "manage_github" {
+  description = "Also write the GitHub Actions variables the deploy workflow needs (INSTANCE_ID, ARTIFACTS_BUCKET, APP_URL, ...). Needs a GITHUB_TOKEN with repo scope in the environment."
+  type        = bool
+  default     = false
+}

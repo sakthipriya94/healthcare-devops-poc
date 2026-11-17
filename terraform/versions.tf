@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.6"
     }
+    github = {
+      source  = "integrations/github"
+      version = "~> 6.0"
+    }
   }
 
   # Partial configuration: supply the bucket/key per environment at init time
@@ -27,4 +31,10 @@ provider "aws" {
       ManagedBy   = "terraform"
     }
   }
+}
+
+# Used only when manage_github = true. Authenticates with the GITHUB_TOKEN environment variable
+# (a personal access token with "repo" scope - never put it in a tfvars file).
+provider "github" {
+  owner = split("/", var.github_repository)[0]
 }

@@ -4,7 +4,8 @@ environment       = "dev"
 aws_region        = "ap-south-1"
 github_repository = "sakthipriya94/healthcare-devops-poc"
 
-manage_ecr = false # the healthcare-backend/frontend/nginx ECR repositories already exist (created outside Terraform); set true only on a fresh account
+manage_ecr    = false # the healthcare-backend/frontend/nginx ECR repositories already exist (created outside Terraform); set true only on a fresh account
+manage_github = true
 
 # Cost-minimal sizing
 instance_type            = "t3.small"
