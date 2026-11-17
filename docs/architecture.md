@@ -13,7 +13,7 @@ flowchart TB
   subgraph VPC["VPC 10.10.0.0/16 (one region, 2 AZs)"]
     direction TB
     subgraph PUB["Public subnets (AZ-a, AZ-b)"]
-      alb["Application Load Balancer<br/>HTTPS :443 (ACM cert)<br/>HTTP :80 -> redirect"]
+      alb["Application Load Balancer<br/>HTTP :80 (DEV POC)<br/>HTTPS :443 (future production)"]
       subgraph EC2["EC2 t3.small - Amazon Linux 2023 (no SSH, SSM only)"]
         nginx["Nginx reverse proxy :80"]
         fe["React container"]
@@ -52,7 +52,7 @@ flowchart TB
 | Layer | What | Where defined |
 |---|---|---|
 | Network | VPC, 2 public + 2 private subnets, IGW, route tables, VPC Flow Logs | `terraform/modules/network` |
-| Firewall | ALB SG (80/443 from internet), App SG (80 from ALB only), RDS SG (5432 from App SG only) | `terraform/modules/security` |
+| Firewall | ALB SG (HTTP 80 for the deployed DEV POC; HTTPS 443 is a future production requirement), App SG (80 from ALB only), RDS SG (5432 from App SG only) | `terraform/modules/security` |
 | Compute | One EC2 host running the Compose stack, behind an ALB | `terraform/modules/compute` |
 | Database | RDS PostgreSQL 16, private, encrypted, forced TLS, 7-day backups | `terraform/modules/database` |
 | Registry | 3 ECR repos, scan-on-push, immutable tags, lifecycle policy | `terraform/modules/ecr` |
@@ -69,12 +69,18 @@ flowchart TB
 
 ## 2. Request flow
 
-1. Browser requests `https://hospital-a.<domain>/`; Route 53 wildcard sends it to the ALB.
-2. ALB terminates TLS (ACM certificate) and forwards HTTP to Nginx, preserving the `Host` header.
+1. Browser requests the DEV ALB HTTP endpoint. Tenant smoke tests send `Host: hospital-a.local` or `Host: hospital-b.local`.
+2. The DEV ALB forwards HTTP traffic to Nginx, preserving the `Host` header. HTTPS termination using ACM and a custom domain is a production requirement, not deployed in this POC.
 3. Nginx serves the React app for `/` and proxies `/api/` to Django, again keeping `Host`.
 4. Django's `TenantMiddleware` resolves `hospital-a` → tenant `hospital_a` and binds it to the request.
 5. The database router sends **every** query to `hospital_a`'s own database and role. See [multi-tenant database](multi-tenant-database.md).
 
 ## 3. Environments
 
-`dev`, `staging` and `prod` are the same Terraform code with different `environments/*.tfvars`; only `dev` is meant to be applied for the POC. See [CI/CD](ci-cd.md#environment-strategy).
+**DEV:** Provisioned and deployed in AWS Mumbai (`ap-south-1`) using Terraform and GitHub Actions. The application currently uses HTTP and synthetic demonstration data.
+
+**UAT / Staging:** Not deployed. Previously provisioned staging resources have been destroyed to control costs.
+
+**Production:** Not deployed. A production rollout would require HTTPS with ACM, stronger application authentication and authorization, production-grade secrets and data protection, approval gates, and tested rollback procedures.
+
+Only DEV is implemented in AWS for this POC. Staging and Production are documented as future environment configurations. See [CI/CD](ci-cd.md#environment-strategy).

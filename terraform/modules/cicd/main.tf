@@ -26,7 +26,7 @@ data "aws_iam_policy_document" "trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:environment:${var.environment}"]
+      values   = ["repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:environment:${var.environment}"]
     }
   }
 }

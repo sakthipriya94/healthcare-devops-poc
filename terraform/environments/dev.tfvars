@@ -2,9 +2,9 @@
 # and stored in AWS Secrets Manager - they never appear in this file.
 environment       = "dev"
 aws_region        = "ap-south-1"
-github_repository = "YOUR_GITHUB_USER/healthcare-multitenant-poc" # <-- change
+github_repository = "sakthipriya94/healthcare-devops-poc" # <-- change
 
-manage_ecr = true # dev owns the shared ECR repositories
+manage_ecr = false # dev owns the shared ECR repositories
 
 # Cost-minimal sizing
 instance_type            = "t3.small"
@@ -12,7 +12,7 @@ db_instance_class        = "db.t4g.micro"
 db_allocated_storage     = 20
 db_multi_az              = false
 db_backup_retention_days = 7
-protect_data             = false
+protect_data             = true
 
 # Optional: set after you own a domain + ACM certificate
 # domain_name     = "dev.example.com"
