@@ -2,9 +2,9 @@
 # and stored in AWS Secrets Manager - they never appear in this file.
 environment       = "dev"
 aws_region        = "ap-south-1"
-github_repository = "YOUR_GITHUB_USER/healthcare-multitenant-poc" # <-- change
+github_repository = "sakthipriya94/healthcare-devops-poc"
 
-manage_ecr = true # dev owns the shared ECR repositories
+manage_ecr = false # the healthcare-backend/frontend/nginx ECR repositories already exist (created outside Terraform); set true only on a fresh account
 
 # Cost-minimal sizing
 instance_type            = "t3.small"
