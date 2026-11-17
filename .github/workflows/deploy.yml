@@ -81,11 +81,22 @@ jobs:
       # --------------------------------------------------------
       # 2. AWS OIDC AUTHENTICATION
       # --------------------------------------------------------
+      - name: Check required GitHub environment variables
+        run: |
+          missing=""
+          for v in INSTANCE_ID ARTIFACTS_BUCKET; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing variable(s):$missing. Add them under Settings -> Environments -> $ENVIRONMENT -> Environment variables (variables, not secrets). Values come from the Terraform outputs."
+            exit 1
+          fi
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::402372753653:role/github-actions-devops-role
-          aws-region: ap-south-1
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN || 'arn:aws:iam::402372753653:role/github-actions-devops-role' }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
           audience: sts.amazonaws.com
           output-env-credentials: true
 

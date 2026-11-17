@@ -16,7 +16,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Only supersede stale pull-request runs. Cancelling a push run could interrupt a deployment half-way.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE_PREFIX: healthcare
@@ -172,34 +173,14 @@ jobs:
           trivyignores: .trivyignore
 
       # --------------------------------------------------------
-      # DEBUG GITHUB OIDC CLAIMS
-      # --------------------------------------------------------
-      - name: Debug GitHub OIDC claims
-        if: env.PUSH == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const token = await core.getIDToken('sts.amazonaws.com');
-
-            const payload = JSON.parse(
-              Buffer.from(token.split('.')[1], 'base64url').toString()
-            );
-
-            console.log('OIDC issuer:', payload.iss);
-            console.log('OIDC audience:', payload.aud);
-            console.log('OIDC subject:', payload.sub);
-            console.log('GitHub repository:', payload.repository);
-            console.log('GitHub ref:', payload.ref);
-
-      # --------------------------------------------------------
       # AWS OIDC AUTHENTICATION
       # --------------------------------------------------------
       - name: Configure AWS credentials (OIDC)
         if: env.PUSH == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::402372753653:role/github-actions-devops-role
-          aws-region: ap-south-1
+          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN || 'arn:aws:iam::402372753653:role/github-actions-devops-role' }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-south-1' }}
           audience: sts.amazonaws.com
           output-env-credentials: true
 
@@ -221,8 +202,20 @@ jobs:
       # --------------------------------------------------------
       # PUSH IMAGE TO ECR
       # --------------------------------------------------------
-      - name: Push to ECR (immutable tag = commit SHA)
+      - name: Check whether this commit's image is already in ECR
         if: env.PUSH == 'true'
+        id: exists
+        run: |
+          if aws ecr describe-images --repository-name "${IMAGE_PREFIX}-${{ matrix.image }}" \
+               --image-ids imageTag="${{ github.sha }}" >/dev/null 2>&1; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Image ${IMAGE_PREFIX}-${{ matrix.image }}:${{ github.sha }} already exists (immutable tag) - skipping push"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push to ECR (immutable tag = commit SHA)
+        if: env.PUSH == 'true' && steps.exists.outputs.found != 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
