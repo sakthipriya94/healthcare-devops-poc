@@ -12,7 +12,8 @@ to_env() { jq -r 'to_entries[] | "\(.key)=\(.value)"'; }
 umask 077
 TMP="$(mktemp /opt/healthcare/.env.XXXXXX)"
 {
-  grep -v '^AWS_DEFAULT_REGION=' /opt/healthcare/static.env
+  grep -Ev '^(AWS_DEFAULT_REGION|DJANGO_ALLOWED_HOSTS)=' /opt/healthcare/static.env
+  printf 'DJANGO_ALLOWED_HOSTS=%s\n' "${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,.localhost},hospital-a.local,hospital-b.local"
   fetch "$PROJECT/$APP_ENV/django" | to_env
   fetch "$PROJECT/$APP_ENV/tenant-db-credentials" | to_env
 } > "$TMP"

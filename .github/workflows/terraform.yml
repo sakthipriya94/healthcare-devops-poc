@@ -44,7 +44,7 @@ jobs:
   plan:
     needs: validate
     # Dependabot PRs get no OIDC token and a read-only GITHUB_TOKEN, so they cannot plan or comment.
-    if: vars.TF_PLAN_ROLE_ARN != '' && github.actor != 'dependabot[bot]'
+    if: false # Local-only POC: AWS planning disabled
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

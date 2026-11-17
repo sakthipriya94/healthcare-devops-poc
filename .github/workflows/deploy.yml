@@ -2,8 +2,7 @@
 name: Deploy
 
 # Used in two ways:
-# 1. Automatically called by ci.yml for DEV and STAGING.
-# 2. Manually triggered for DEV, STAGING, PROD or rollback.
+# Called by ci.yml for DEV or manually triggered for DEV.
 
 on:
   workflow_call:
@@ -22,8 +21,6 @@ on:
         type: choice
         options:
           - dev
-          - staging
-          - prod
         required: true
 
       action:
@@ -59,8 +56,7 @@ jobs:
       name: ${{ inputs.environment }}
 
     # Production deployment only from main
-    if: inputs.environment != 'prod' || github.ref == 'refs/heads/main'
-
+    if: inputs.environment == 'dev'
     env:
       AWS_REGION: ap-south-1
       INSTANCE_ID: ${{ vars.INSTANCE_ID }}
@@ -84,7 +80,7 @@ jobs:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::402372753653:role/github-actions-devops-role
+          role-to-assume: arn:aws:iam::402372753653:role/healthcare-dev-github-deploy
           aws-region: ap-south-1
           audience: sts.amazonaws.com
           output-env-credentials: true

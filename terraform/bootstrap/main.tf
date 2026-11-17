@@ -87,8 +87,11 @@ data "aws_iam_policy_document" "trust_ci" {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
       values = [
-        "repo:${var.github_repository}:ref:refs/heads/main",
-        "repo:${var.github_repository}:ref:refs/heads/develop",
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:ref:refs/heads/main",
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:ref:refs/heads/develop",
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:environment:dev",
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:environment:staging",
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:environment:prod",
       ]
     }
   }
@@ -137,7 +140,10 @@ data "aws_iam_policy_document" "trust_plan" {
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:${var.github_repository}:pull_request", "repo:${var.github_repository}:ref:refs/heads/*"]
+      values = [
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:pull_request",
+        "repo:sakthipriya94@299290563/healthcare-devops-poc@1460570506:ref:refs/heads/*",
+      ]
     }
   }
 }

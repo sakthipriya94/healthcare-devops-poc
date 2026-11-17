@@ -53,3 +53,11 @@ node_modules/
 .terraform/
 *.dump
 .DS_Store
+
+# Local Terraform plans and temporary workflow backups
+*.tfplan
+*.tfplan.backup
+*.before-dev-enable
+*.local-only.bak
+*.pre-dev-fix
+*.backend.hcl
