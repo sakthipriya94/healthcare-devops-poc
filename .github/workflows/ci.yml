@@ -129,8 +129,10 @@ jobs:
         if: env.PUSH == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.AWS_ECR_PUSH_ROLE_ARN }}
-          aws-region: ${{ vars.AWS_REGION }}
+          role-to-assume: arn:aws:iam::402372753653:role/github-actions-devops-role
+          aws-region: ap-south-1
+          audience: sts.amazonaws.com
+          output-env-credentials: true
 
       - name: Login to Amazon ECR
         if: env.PUSH == 'true'
