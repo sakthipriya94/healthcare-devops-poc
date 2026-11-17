@@ -6,7 +6,9 @@
       "name": "Hospital A",
       "subdomain": "hospital-a",
       "region": "ap-south-1",
-      "hosts": [],
+      "hosts": [
+        "hospital-a.local"
+      ],
       "db": {
         "name": "hospital_a",
         "user": "hospital_a_user",
@@ -19,7 +21,9 @@
       "name": "Hospital B",
       "subdomain": "hospital-b",
       "region": "ap-south-1",
-      "hosts": [],
+      "hosts": [
+        "hospital-b.local"
+      ],
       "db": {
         "name": "hospital_b",
         "user": "hospital_b_user",
