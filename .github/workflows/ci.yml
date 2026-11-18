@@ -133,7 +133,7 @@ jobs:
             dockerfile: nginx/Dockerfile
 
     env:
-      PUSH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+      PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
 
     steps:
       - name: Checkout code
@@ -235,7 +235,7 @@ jobs:
   deploy-dev:
     name: Deploy to DEV
 
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
     needs: images
 
     permissions:
